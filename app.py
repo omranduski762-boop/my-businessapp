@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 
+# 1. دەرگەهێ پاسۆردی
 def check_password():
     if "password_correct" not in st.session_state:
         st.text_input("پاسۆردی بنڤیسە:", type="password", key="password")
@@ -17,54 +18,60 @@ def check_password():
 if check_password():
     st.set_page_config(layout="wide", page_title="Shoes Pro System")
 
+    # CSS بۆ دیتنەکا جوان
+    st.markdown("""
+        <style>
+        .box-container { background-color: #e3f2fd; padding: 20px; border-radius: 15px; border: 2px solid #90caf9; }
+        </style>
+        """, unsafe_allow_html=True)
+
     FILE_NAME = "shoes_data.csv"
     if not os.path.exists(FILE_NAME):
-        pd.DataFrame(columns=['مێژوو', 'مارکە', 'کەمی', 'بها (IQD)', 'جۆر']).to_csv(FILE_NAME, index=False)
+        pd.DataFrame(columns=['مێژوو', 'مارکە', 'کەمی', 'بها (IQD)', 'کۆما گشتی', 'جۆر', 'بهایێ کڕینێ']).to_csv(FILE_NAME, index=False)
     
     df = pd.read_csv(FILE_NAME)
 
-    # --- حسابکرنا دروست بۆ داشبۆردێ ---
-    # کڕین: کەمی (+) | فرۆتن: کەمی (-)
-    # کۆیا پارچەیێن مایی
+    # --- حسابکرنا ئاماران ---
     total_qty = df['کەمی'].sum()
-    
-    # کۆیێ پارێ فرۆتنێ
-    total_sales = df[df['جۆر'] == 'فرۆتن']['بها (IQD)'].sum()
-    
-    # کۆیێ پارێ کڕینێ
-    total_buy = df[df['جۆر'] == 'کڕین']['بها (IQD)'].sum()
-    
-    # قازانجا گشتی
+    total_sales = df[df['جۆر'] == 'فرۆتن']['کۆما گشتی'].sum()
+    total_buy = df[df['جۆر'] == 'کڕین']['کۆما گشتی'].sum()
     profit = total_sales - total_buy
 
-    # داشبۆرد
-    st.title("📊 داشۆردا گشتی")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("کۆی پارچەیێن مایی", int(total_qty))
-    col2.metric("پارێ فرۆتنێ", f"{total_sales:,.0f} IQD")
-    col3.metric("پارێ کڕینێ", f"{total_buy:,.0f} IQD")
-    col4.metric("قازانجا گشتی", f"{profit:,.0f} IQD")
-    
-    st.markdown("---")
+    # --- داشبۆرد ---
+    st.markdown('<div class="box-container"><h2>📊 داشۆردا گشتی</h2>', unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("کۆی پارچە", int(total_qty))
+    c2.metric("پارێ فرۆتنێ", f"{total_sales:,.0f}")
+    c3.metric("پارێ کڕینێ", f"{total_buy:,.0f}")
+    c4.metric("قازانجا گشتی", f"{profit:,.0f}")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # Tabs
-    tab1, tab2 = st.tabs(["📦 مەخزەن و لیستە", "➕ تومارکرنا نوی"])
+    # --- Tabs ---
+    tab1, tab2, tab3, tab4 = st.tabs(["📦 مەخزەن", "💰 فرۆتن", "➕ تومارکرن", "📊 ئامار"])
 
     with tab1:
         st.subheader("📦 لیستەیا مەخزەنی")
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df.groupby('مارکە')['کەمی'].sum(), use_container_width=True)
 
     with tab2:
-        with st.form("add_form"):
-            b = st.text_input("مارکە")
-            k = st.number_input("کەمی", step=1)
-            p = st.number_input("بها (IQD)")
-            j = st.selectbox("جۆر", ["کڕین", "فرۆتن"])
-            if st.form_submit_button("تۆمار بکە"):
-                # ئەگەر فرۆتن بیت، کەمی دێ بیتە نێگەتیڤ (-)
-                final_k = -k if j == 'فرۆتن' else k
-                new_row = pd.DataFrame([[pd.Timestamp.now().date(), b, final_k, p, j]], 
-                                       columns=['مێژوو', 'مارکە', 'کەمی', 'بها (IQD)', 'جۆر'])
-                new_row.to_csv(FILE_NAME, mode='a', header=False, index=False)
-                st.success("هاتە تۆمارکرن!")
+        st.subheader("💰 تشتێن فرۆتی")
+        st.dataframe(df[df['جۆر'] == 'فرۆتن'], use_container_width=True)
+
+    with tab3:
+        with st.form("add_form", clear_on_submit=True):
+            brand = st.text_input("مارکە")
+            qty = st.number_input("کەمی", min_value=1)
+            price = st.number_input("بها (IQD)")
+            op_type = st.selectbox("جۆر", ["کڕین", "فرۆتن"])
+            if st.form_submit_button("تۆمار بکە 💾"):
+                f_qty = -qty if op_type == 'فرۆتن' else qty
+                new_row = pd.DataFrame([[pd.Timestamp.now().date(), brand, f_qty, price, (qty * price), op_type, 0]], 
+                                       columns=['مێژوو', 'مارکە', 'کەمی', 'بها (IQD)', 'کۆما گشتی', 'جۆر', 'بهایێ کڕینێ'])
+                pd.concat([df, new_row], ignore_index=True).to_csv(FILE_NAME, index=False)
                 st.rerun()
+
+    with tab4:
+        st.subheader("📊 ئامارێن زیندە")
+        st.bar_chart(df.groupby('مارکە')['کەمی'].sum())
+        if st.button("🚨 ژێبرنا هەموو داتایان"):
+            pd.DataFrame(columns=['مێژوو', 'مارکە', 'کەمی', 'بها (IQD)', 'کۆما گشتی', 'جۆر', 'بهایێ کڕینێ']).to_csv(FILE_NAME, index=False); st.rerun()
