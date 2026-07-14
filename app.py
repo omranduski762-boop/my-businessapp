@@ -5,7 +5,7 @@ import os
 # 1. دەرگەهێ پاسۆردی
 def check_password():
     def password_entered():
-        if st.session_state["password"] == "12345": # تو دشێی ل ڤێرێ پاسۆردی بگوهۆری
+        if st.session_state["password"] == "o.m.511": # تو دشێی ل ڤێرێ پاسۆردی بگوهۆری
             st.session_state["password_correct"] = True
             del st.session_state["password"]
         else:
