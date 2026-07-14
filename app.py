@@ -5,7 +5,7 @@ import os
 # 1. دەرگەهێ پاسۆردی
 def check_password():
     def password_entered():
-        if st.session_state["password"] == "o.m.511": # تو دشێی ل ڤێرێ پاسۆردی بگوهۆری
+        if st.session_state["password"] == "o.m.511": 
             st.session_state["password_correct"] = True
             del st.session_state["password"]
         else:
@@ -21,7 +21,7 @@ def check_password():
     else:
         return True
 
-# 2. ئەگەر پاسۆرد درست بوو، سیستەمێ تە یێ Inventory Pro یێ هەموو دێ کار کەت
+# 2. دەستپێکا سیستەمێ
 if check_password():
     st.set_page_config(layout="wide", page_title="Shoes Pro System")
 
@@ -44,41 +44,26 @@ if check_password():
 
     # --- حسابکرنا داشبۆردێ ---
     stock_summary = df.groupby('مارکە')['کەمی'].sum().reset_index()
-    stock_val = 0
-    for brand in stock_summary[stock_summary['کەمی'] > 0]['مارکە']:
-        qty_left = stock_summary[stock_summary['مارکە'] == brand]['کەمی'].values[0]
-        buy_price = df[(df['مارکە'] == brand) & (df['جۆر'] == 'کڕین')]['بها (IQD)'].iloc[-1]
-        stock_val += (qty_left * buy_price)
-
-    total_sales_revenue = df[df['جۆر'] == 'فرۆتن']['کۆما گشتی'].sum()
-
-    # داشبۆرد
-    st.markdown('<div class="box-container"><h2>📊 داشۆردا گشتی</h2>', unsafe_allow_html=True)
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("کۆی پارچەیێن مایی", int(stock_summary['کەمی'].sum()))
-    col2.metric("پارێ مەخزەنی (بهایێ کڕینێ)", f"{stock_val:,.0f}")
-    col3.metric("پارێ ژ فرۆتنێ هاتی", f"{total_sales_revenue:,.0f}")
-    col4.metric("کێمتر ژ 2 جوت", len(stock_summary[stock_summary['کەمی'] <= 2]))
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="box-container">', unsafe_allow_html=True)
-    tab1, tab2, tab3, tab4 = st.tabs(["📦 مەخزەن", "💰 فرۆتن", "➕ تومارکرن", "📊 ئامار"])
+    
+    st.markdown('<div class="box-container"><h2>📊 داشبۆرد و قازانج</h2>', unsafe_allow_html=True)
+    
+    # 3. پشکێ مەخزەن و قازانجی
+    tab1, tab2, tab3, tab4 = st.tabs(["📦 مەخزەن و قازانج", "💰 فرۆتن", "➕ تومارکرن", "📊 ئامار"])
 
     with tab1:
         st.subheader("📦 لیستەیا مەخزەنی")
-        summary = df.groupby('مارکە').agg({'کەمی': 'sum', 'بها (IQD)': 'last'}).reset_index()
-        for _, row in summary.iterrows():
-            if row['کەمی'] > 0:
-                st.markdown(f'''<div class="metric-card"><h4>👟 {row["مارکە"]}</h4>
-                <p>کەمی: {row["کەمی"]} جوت | <b>بهایێ هەر جوتەکێ: {row["بها (IQD)"]:,.0f} IQD</b></p></div>''', unsafe_allow_html=True)
-                if st.button(f"🗑️ ژێبرنا {row['مارکە']}", key=f"del_{row['مارکە']}"):
-                    st.session_state.data = st.session_state.data[st.session_state.data['مارکە'] != row['مارکە']]
-                    st.session_state.data.to_csv(FILE_NAME, index=False); st.rerun()
+        for brand in stock_summary[stock_summary['کەمی'] > 0]['مارکە']:
+            qty = stock_summary[stock_summary['مارکە'] == brand]['کەمی'].values[0]
+            buy_price = df[(df['مارکە'] == brand) & (df['جۆر'] == 'کڕین')]['بها (IQD)'].iloc[-1]
+            sell_price = df[(df['مارکە'] == brand) & (df['جۆر'] == 'فرۆتن')]['بها (IQD)'].iloc[-1] if not df[(df['مارکە'] == brand) & (df['جۆر'] == 'فرۆتن')].empty else 0
+            profit = (sell_price - buy_price) if sell_price > 0 else 0
+            
+            st.markdown(f'''<div class="metric-card"><h4>👟 {brand}</h4>
+            <p>کەمی: {qty} | <b>قازانجا هەر جوتەکێ: {profit:,.0f} IQD</b></p></div>''', unsafe_allow_html=True)
 
     with tab2:
         st.subheader("💰 تشتێن فرۆتی")
-        for _, row in df[df['جۆر'] == 'فرۆتن'].iterrows():
-            st.markdown(f'<div class="metric-card"><h4>🛍️ {row["مارکە"]}</h4><p>پارێ فرۆتنێ: {row["کۆما گشتی"]:,.0f}</p></div>', unsafe_allow_html=True)
+        st.dataframe(df[df['جۆر'] == 'فرۆتن'])
 
     with tab3:
         st.subheader("➕ تومارکرنا نوی")
@@ -88,12 +73,13 @@ if check_password():
             price = st.number_input("بها (IQD)", min_value=0)
             op_type = st.selectbox("جۆر", ["کڕین", "فرۆتن"])
             if st.form_submit_button("تۆمار بکە 💾"):
-                f_qty = -qty if op_type == 'فرۆتن' else qty
-                new_row = pd.DataFrame([[pd.Timestamp.now().date(), brand, f_qty, price, (qty * price), op_type, 0]], 
+                new_row = pd.DataFrame([[pd.Timestamp.now().date(), brand, (-qty if op_type == 'فرۆتن' else qty), price, (qty * price), op_type, 0]], 
                                        columns=['مێژوو', 'مارکە', 'کەمی', 'بها (IQD)', 'کۆما گشتی', 'جۆر', 'بهایێ کڕینێ'])
                 st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True); st.session_state.data.to_csv(FILE_NAME, index=False); st.rerun()
 
     with tab4:
+        if st.button("💾 دابەزاندنا داتایان (Backup)"):
+            st.download_button("دابەزاندنا CSV", df.to_csv(index=False), "shoes_backup.csv", "text/csv")
         if st.button("🚨 ژێبرنا هەموو داتایان"):
             st.session_state.data = pd.DataFrame(columns=['مێژوو', 'مارکە', 'کەمی', 'بها (IQD)', 'کۆما گشتی', 'جۆر', 'بهایێ کڕینێ']); st.session_state.data.to_csv(FILE_NAME, index=False); st.rerun()
 
