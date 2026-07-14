@@ -2,10 +2,9 @@ import streamlit as st
 import pandas as pd
 import os
 
-# 1. دەرگەهێ پاسۆردی
 def check_password():
     def password_entered():
-        if st.session_state["password"] == "o.m.511": 
+        if st.session_state["password"] == "12345": 
             st.session_state["password_correct"] = True
             del st.session_state["password"]
         else:
@@ -21,7 +20,6 @@ def check_password():
     else:
         return True
 
-# 2. دەستپێکا سیستەمێ
 if check_password():
     st.set_page_config(layout="wide", page_title="Shoes Pro System")
 
@@ -34,32 +32,27 @@ if check_password():
         """, unsafe_allow_html=True)
 
     FILE_NAME = "shoes_data.csv"
-
-    def load_data():
-        if os.path.exists(FILE_NAME): return pd.read_csv(FILE_NAME)
-        else: return pd.DataFrame(columns=['مێژوو', 'مارکە', 'کەمی', 'بها (IQD)', 'کۆما گشتی', 'جۆر', 'بهایێ کڕینێ'])
-
-    if 'data' not in st.session_state: st.session_state.data = load_data()
-    df = st.session_state.data
-
-    # --- حسابکرنا داشبۆردێ ---
-    stock_summary = df.groupby('مارکە')['کەمی'].sum().reset_index()
+    if not os.path.exists(FILE_NAME):
+        pd.DataFrame(columns=['مێژوو', 'مارکە', 'کەمی', 'بها (IQD)', 'کۆما گشتی', 'جۆر', 'بهایێ کڕینێ']).to_csv(FILE_NAME, index=False)
     
-    st.markdown('<div class="box-container"><h2>📊 داشبۆرد و قازانج</h2>', unsafe_allow_html=True)
-    
-    # 3. پشکێ مەخزەن و قازانجی
+    df = pd.read_csv(FILE_NAME)
+
+    # --- داشبۆردێ ل سەری دابنێ ---
+    st.markdown('<div class="box-container"><h2>📊 داشبۆرد و ئامار</h2>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    col1.metric("کۆی پارچەیێن مایی", int(df['کەمی'].sum()))
+    col2.metric("کۆی پارێ فرۆتنێ", f"{df[df['جۆر'] == 'فرۆتن']['کۆما گشتی'].sum():,.0f} IQD")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # --- Tabs ---
     tab1, tab2, tab3, tab4 = st.tabs(["📦 مەخزەن و قازانج", "💰 فرۆتن", "➕ تومارکرن", "📊 ئامار"])
 
     with tab1:
         st.subheader("📦 لیستەیا مەخزەنی")
-        for brand in stock_summary[stock_summary['کەمی'] > 0]['مارکە']:
-            qty = stock_summary[stock_summary['مارکە'] == brand]['کەمی'].values[0]
-            buy_price = df[(df['مارکە'] == brand) & (df['جۆر'] == 'کڕین')]['بها (IQD)'].iloc[-1]
-            sell_price = df[(df['مارکە'] == brand) & (df['جۆر'] == 'فرۆتن')]['بها (IQD)'].iloc[-1] if not df[(df['مارکە'] == brand) & (df['جۆر'] == 'فرۆتن')].empty else 0
-            profit = (sell_price - buy_price) if sell_price > 0 else 0
-            
-            st.markdown(f'''<div class="metric-card"><h4>👟 {brand}</h4>
-            <p>کەمی: {qty} | <b>قازانجا هەر جوتەکێ: {profit:,.0f} IQD</b></p></div>''', unsafe_allow_html=True)
+        summary = df.groupby('مارکە').agg({'کەمی': 'sum', 'بها (IQD)': 'last'}).reset_index()
+        for _, row in summary.iterrows():
+            if row['کەمی'] > 0:
+                st.markdown(f'<div class="metric-card"><h4>👟 {row["مارکە"]}</h4><p>کەمی: {row["کەمی"]} | بها: {row["بها (IQD)"]:,.0f} IQD</p></div>', unsafe_allow_html=True)
 
     with tab2:
         st.subheader("💰 تشتێن فرۆتی")
@@ -75,12 +68,10 @@ if check_password():
             if st.form_submit_button("تۆمار بکە 💾"):
                 new_row = pd.DataFrame([[pd.Timestamp.now().date(), brand, (-qty if op_type == 'فرۆتن' else qty), price, (qty * price), op_type, 0]], 
                                        columns=['مێژوو', 'مارکە', 'کەمی', 'بها (IQD)', 'کۆما گشتی', 'جۆر', 'بهایێ کڕینێ'])
-                st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True); st.session_state.data.to_csv(FILE_NAME, index=False); st.rerun()
+                df = pd.concat([df, new_row], ignore_index=True); df.to_csv(FILE_NAME, index=False); st.rerun()
 
     with tab4:
         if st.button("💾 دابەزاندنا داتایان (Backup)"):
             st.download_button("دابەزاندنا CSV", df.to_csv(index=False), "shoes_backup.csv", "text/csv")
         if st.button("🚨 ژێبرنا هەموو داتایان"):
-            st.session_state.data = pd.DataFrame(columns=['مێژوو', 'مارکە', 'کەمی', 'بها (IQD)', 'کۆما گشتی', 'جۆر', 'بهایێ کڕینێ']); st.session_state.data.to_csv(FILE_NAME, index=False); st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
+            pd.DataFrame(columns=['مێژوو', 'مارکە', 'کەمی', 'بها (IQD)', 'کۆما گشتی', 'جۆر', 'بهایێ کڕینێ']).to_csv(FILE_NAME, index=False); st.rerun()
