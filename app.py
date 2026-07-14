@@ -23,9 +23,7 @@ def check_password():
 # ئەگەر پاسۆرد درست بوو، سیستەمێ مخزنی کار دکەت
 if check_password():
     st.title("bussnes.app")
-    # ڤێرێ داتایێ بخوینە
-    df = pd.read_csv('shoes_data.csv') 
-    st.dataframe(df)
+  
 import streamlit as st
 import pandas as pd
 import os
