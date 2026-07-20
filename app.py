@@ -75,3 +75,4 @@ if check_password():
         st.bar_chart(df.groupby('مارکە')['کەمی'].sum())
         if st.button("🚨 ژێبرنا هەموو داتایان"):
             pd.DataFrame(columns=['مێژوو', 'مارکە', 'کەمی', 'بها (IQD)', 'کۆما گشتی', 'جۆر', 'بهایێ کڕینێ']).to_csv(FILE_NAME, index=False); st.rerun()
+            
